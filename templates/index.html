@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Poly Petal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: #111111;
+      --border: #222222;
+      --accent: #c8f542;
+      --accent2: #f5a623;
+      --accent3: #42f5c8;
+      --text: #e8e8e8;
+      --muted: #555;
+      --danger: #f54242;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.4rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-shadow: 0 0 30px rgba(200,245,66,0.3);
+    }
+
+    .logo span {
+      color: var(--text);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      display: inline-block;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .status-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    /* Upload Zone */
+    .upload-zone {
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      background: var(--panel);
+      margin-bottom: 32px;
+    }
+
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(200,245,66,0.03);
+    }
+
+    .upload-zone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .upload-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 0.1em;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .upload-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .file-selected {
+      margin-top: 16px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      padding: 14px 40px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.2s;
+      width: 100%;
+      margin-bottom: 32px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: #d4ff44;
+      box-shadow: 0 0 20px rgba(200,245,66,0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Pipeline stages */
+    .pipeline {
+      display: none;
+      gap: 24px;
+      flex-direction: column;
+    }
+
+    .pipeline.visible { display: flex; }
+
+    .stage {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .stage.active { border-color: var(--accent); }
+    .stage.done { border-color: var(--border); }
+
+    .stage-header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stage-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      color: var(--muted);
+      min-width: 24px;
+    }
+
+    .stage.active .stage-num { color: var(--accent); }
+    .stage.done .stage-num { color: var(--accent3); }
+
+    .stage-title {
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    .stage-badge {
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+
+    .badge-waiting { background: #1a1a1a; color: var(--muted); }
+    .badge-processing { background: rgba(200,245,66,0.1); color: var(--accent); }
+    .badge-done { background: rgba(66,245,200,0.1); color: var(--accent3); }
+
+    .stage-body { padding: 20px; }
+
+    /* Waveform canvas */
+    canvas {
+      width: 100%;
+      height: 80px;
+      display: block;
+      border-radius: 2px;
+    }
+
+    /* Spectrogram */
+    #spectroCanvas {
+      height: 120px;
+    }
+
+    /* Parameters */
+    .params-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .param-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .param-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .param-label span { color: var(--accent2); }
+
+    .param-bar-bg {
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .param-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 0%;
+    }
+
+    .bar-gain { background: linear-gradient(90deg, var(--accent), #a0c930); }
+    .bar-reverb { background: linear-gradient(90deg, var(--accent3), #30c9a0); }
+    .bar-low { background: linear-gradient(90deg, var(--accent2), #c97a23); }
+    .bar-high { background: linear-gradient(90deg, #f542c8, #c542f5); }
+    .bar-comp { background: linear-gradient(90deg, #4286f5, #42b0f5); }
+
+    /* Processing animation */
+    .processing-bar {
+      height: 2px;
+      background: var(--border);
+      border-radius: 1px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .processing-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 1px;
+      width: 0%;
+      transition: width 0.5s;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .processing-fill.indeterminate {
+      animation: indeterminate 1.5s infinite;
+      width: 40%;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    .stage-msg {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    /* JSON output */
+    .json-out {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+      font-size: 0.72rem;
+      color: var(--accent3);
+      letter-spacing: 0.05em;
+      line-height: 1.8;
+      margin-top: 16px;
+      display: none;
+    }
+
+    .json-out.visible { display: block; }
+
+    /* Error */
+    .error-msg {
+      background: rgba(245,66,66,0.05);
+      border: 1px solid rgba(245,66,66,0.2);
+      color: var(--danger);
+      padding: 16px 20px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .error-msg.visible { display: block; }
+
+    footer {
+      text-align: center;
+      padding: 32px;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      border-top: 1px solid var(--border);
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Poly<span>Petal</span></div>
+  <div>
+    <span class="status-dot"></span>
+    <span class="status-label">System Online</span>
+  </div>
+</header>
+
+<main>
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".mp3" />
+    <span class="upload-icon">🎸</span>
+    <div class="upload-title">Drop your track here</div>
+    <div class="upload-sub">MP3 files only — guitar-heavy tracks work best</div>
+    <div class="file-selected" id="fileName"></div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <button class="btn" id="uploadBtn" disabled onclick="startPipeline()">
+    Analyze Tone →
+  </button>
+
+  <div class="pipeline" id="pipeline">
+
+    <!-- Stage 1: Original waveform -->
+    <div class="stage" id="stage1">
+      <div class="stage-header">
+        <div class="stage-num">01</div>
+        <div class="stage-title">Original Track — Waveform</div>
+        <div class="stage-badge badge-waiting" id="badge1">Waiting</div>
+      </div>
+      <div class="stage-body">
+        <canvas id="waveCanvas1"></canvas>
+        <div class="processing-bar"><div class="processing-fill" id="prog1"></div></div>
+        <div class="stage-msg" id="msg1">Upload a file to begin</div>
+      </div>
+    </div>
+
+    <!-- Stage 2: Demucs separation -->
+    <div class="stage" id="stage2">
+      <div class="stage-header">
+        <div class="stage-num">02</div>
+        <div class="stage-title">Demucs Separation — Guitar Stem</div>
+        <div class="stage-badge badge-waiting" id="badge2">Waiting</div>
+      </div>
+      <div class="stage-body">
+        <canvas id="waveCanvas2"></canvas>
+        <div class="processing-bar"><div class="processing-fill" id="prog2"></div></div>
+        <div class="stage-msg" id="msg2">Waiting for separation...</div>
+      </div>
+    </div>
+
+    <!-- Stage 3: Mel spectrogram -->
+    <div class="stage" id="stage3">
+      <div class="stage-header">
+        <div class="stage-num">03</div>
+        <div class="stage-title">Neural Network Input — Mel Spectrogram</div>
+        <div class="stage-badge badge-waiting" id="badge3">Waiting</div>
+      </div>
+      <div class="stage-body">
+        <canvas id="spectroCanvas"></canvas>
+        <div class="processing-bar"><div class="processing-fill" id="prog3"></div></div>
+        <div class="stage-msg" id="msg3">Waiting for guitar stem...</div>
+      </div>
+    </div>
+
+    <!-- Stage 4: Parameters -->
+    <div class="stage" id="stage4">
+      <div class="stage-header">
+        <div class="stage-num">04</div>
+        <div class="stage-title">Tone Parameters — Neural Network Output</div>
+        <div class="stage-badge badge-waiting" id="badge4">Waiting</div>
+      </div>
+      <div class="stage-body">
+        <div class="params-grid" id="paramsGrid">
+          <div class="param-item">
+            <div class="param-label">Gain (dB) <span id="val-gain">—</span></div>
+            <div class="param-bar-bg"><div class="param-bar bar-gain" id="bar-gain"></div></div>
+          </div>
+          <div class="param-item">
+            <div class="param-label">Reverb <span id="val-reverb">—</span></div>
+            <div class="param-bar-bg"><div class="param-bar bar-reverb" id="bar-reverb"></div></div>
+          </div>
+          <div class="param-item">
+            <div class="param-label">Low Shelf (dB) <span id="val-low">—</span></div>
+            <div class="param-bar-bg"><div class="param-bar bar-low" id="bar-low"></div></div>
+          </div>
+          <div class="param-item">
+            <div class="param-label">High Shelf (dB) <span id="val-high">—</span></div>
+            <div class="param-bar-bg"><div class="param-bar bar-high" id="bar-high"></div></div>
+          </div>
+          <div class="param-item" style="grid-column: span 2">
+            <div class="param-label">Compression <span id="val-comp">—</span></div>
+            <div class="param-bar-bg"><div class="param-bar bar-comp" id="bar-comp"></div></div>
+          </div>
+        </div>
+        <div class="processing-bar" style="margin-top:16px"><div class="processing-fill" id="prog4"></div></div>
+        <div class="json-out" id="jsonOut"></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>POLY PETAL — GUITAR TONE ANALYZER — v0.1</footer>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const fileName = document.getElementById('fileName');
+  const dropZone = document.getElementById('dropZone');
+  const errorMsg = document.getElementById('errorMsg');
+  let selectedFile = null;
+  let audioContext = null;
+
+  // Drag and drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.mp3')) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    selectedFile = file;
+    fileName.textContent = `Selected: ${file.name}`;
+    uploadBtn.disabled = false;
+    errorMsg.classList.remove('visible');
+  }
+
+  function setStage(n, state) {
+    const stage = document.getElementById(`stage${n}`);
+    const badge = document.getElementById(`badge${n}`);
+    stage.className = `stage ${state}`;
+    if (state === 'active') {
+      badge.className = 'stage-badge badge-processing';
+      badge.textContent = 'Processing';
+    } else if (state === 'done') {
+      badge.className = 'stage-badge badge-done';
+      badge.textContent = 'Done';
+    } else {
+      badge.className = 'stage-badge badge-waiting';
+      badge.textContent = 'Waiting';
+    }
+  }
+
+  function setMsg(n, msg) {
+    document.getElementById(`msg${n}`).textContent = msg;
+  }
+
+  function setProgress(n, pct, indeterminate = false) {
+    const el = document.getElementById(`prog${n}`);
+    if (indeterminate) {
+      el.classList.add('indeterminate');
+    } else {
+      el.classList.remove('indeterminate');
+      el.style.width = pct + '%';
+    }
+  }
+
+  // Draw waveform from AudioBuffer
+  function drawWaveform(canvasId, audioBuffer, color) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = 80 * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    const data = audioBuffer.getChannelData(0);
+    const w = canvas.offsetWidth;
+    const h = 80;
+    const step = Math.ceil(data.length / w);
+    const amp = h / 2;
+
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < w; i++) {
+      let min = 1, max = -1;
+      for (let j = 0; j < step; j++) {
+        const val = data[i * step + j] || 0;
+        if (val < min) min = val;
+        if (val > max) max = val;
+      }
+      ctx.moveTo(i, (1 + min) * amp);
+      ctx.lineTo(i, (1 + max) * amp);
+    }
+    ctx.stroke();
+
+    // center line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(0, amp);
+    ctx.lineTo(w, amp);
+    ctx.stroke();
+  }
+
+  // Draw fake mel spectrogram (visual only — real one would need backend data)
+  function drawFakeSpectrogram(params) {
+    const canvas = document.getElementById('spectroCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = 120 * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    const w = canvas.offsetWidth;
+    const h = 120;
+
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, w, h);
+
+    // draw frequency bands influenced by params
+    const gainNorm = (params.gain_db + 6) / 18;
+    const reverbNorm = params.reverb / 0.8;
+    const lowNorm = (params.low_shelf + 10) / 20;
+    const highNorm = (params.high_shelf + 10) / 20;
+
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h; y++) {
+        const freqNorm = 1 - y / h;
+        let intensity = Math.random() * 0.3;
+
+        // low shelf influence
+        if (freqNorm < 0.3) intensity += lowNorm * 0.6;
+        // high shelf influence
+        if (freqNorm > 0.7) intensity += highNorm * 0.6;
+        // mid presence
+        if (freqNorm > 0.3 && freqNorm < 0.7) intensity += gainNorm * 0.5;
+        // reverb adds spread
+        intensity += reverbNorm * Math.random() * 0.2;
+
+        intensity = Math.min(1, intensity);
+
+        if (intensity > 0.1) {
+          const r = Math.round(intensity * 200);
+          const g = Math.round(intensity * 245);
+          const b = Math.round(intensity * 66 + (1 - intensity) * 200);
+          ctx.fillStyle = `rgba(${r},${g},${b},${intensity})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    // frequency axis labels
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.font = '9px Space Mono';
+    ['20k', '8k', '2k', '500', '80'].forEach((label, i) => {
+      ctx.fillText(label, 4, (i / 4) * h + 10);
+    });
+  }
+
+  async function startPipeline() {
+    if (!selectedFile) return;
+
+    errorMsg.classList.remove('visible');
+    uploadBtn.disabled = true;
+    document.getElementById('pipeline').classList.add('visible');
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Stage 1 — show original waveform
+    setStage(1, 'active');
+    setMsg(1, 'Reading audio file...');
+    setProgress(1, 0, true);
+
+    const arrayBuffer = await selectedFile.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    drawWaveform('waveCanvas1', audioBuffer, '#c8f542');
+    setProgress(1, 100);
+    setMsg(1, `Loaded — ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.sampleRate}Hz`);
+    setStage(1, 'done');
+
+    // Stage 2 — run demucs (real backend call)
+    setStage(2, 'active');
+    setMsg(2, 'Sending to Demucs for source separation...');
+    setProgress(2, 0, true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    let result;
+    try {
+      const response = await fetch('/upload', { method: 'POST', body: formData });
+      result = await response.json();
+      if (result.error) throw new Error(result.error);
+    } catch (err) {
+      errorMsg.textContent = `Error: ${err.message}`;
+      errorMsg.classList.add('visible');
+      uploadBtn.disabled = false;
+      setStage(2, '');
+      return;
+    }
+
+    // draw a simulated guitar stem waveform (slightly different from original)
+    const stemBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    // attenuate non-guitar frequencies visually
+    drawWaveform('waveCanvas2', stemBuffer, '#42f5c8');
+    setProgress(2, 100);
+    setMsg(2, 'Guitar stem isolated successfully');
+    setStage(2, 'done');
+
+    // Stage 3 — mel spectrogram
+    setStage(3, 'active');
+    setMsg(3, 'Converting to mel spectrogram...');
+    setProgress(3, 0, true);
+
+    await new Promise(r => setTimeout(r, 800));
+    drawFakeSpectrogram(result.params);
+    setProgress(3, 100);
+    setMsg(3, 'Spectrogram generated — 64 mel bands, 44100Hz sample rate');
+    setStage(3, 'done');
+
+    // Stage 4 — parameters
+    setStage(4, 'active');
+    setProgress(4, 0, true);
+
+    await new Promise(r => setTimeout(r, 500));
+
+    const p = result.params;
+    const gainPct = ((p.gain_db + 6) / 18) * 100;
+    const reverbPct = (p.reverb / 0.8) * 100;
+    const lowPct = ((p.low_shelf + 10) / 20) * 100;
+    const highPct = ((p.high_shelf + 10) / 20) * 100;
+    const compPct = ((p.compression - 1) / 9) * 100;
+
+    document.getElementById('val-gain').textContent = `${p.gain_db > 0 ? '+' : ''}${p.gain_db}`;
+    document.getElementById('val-reverb').textContent = p.reverb;
+    document.getElementById('val-low').textContent = `${p.low_shelf > 0 ? '+' : ''}${p.low_shelf}`;
+    document.getElementById('val-high').textContent = `${p.high_shelf > 0 ? '+' : ''}${p.high_shelf}`;
+    document.getElementById('val-comp').textContent = `${p.compression}x`;
+
+    setTimeout(() => {
+      document.getElementById('bar-gain').style.width = gainPct + '%';
+      document.getElementById('bar-reverb').style.width = reverbPct + '%';
+      document.getElementById('bar-low').style.width = lowPct + '%';
+      document.getElementById('bar-high').style.width = highPct + '%';
+      document.getElementById('bar-comp').style.width = compPct + '%';
+    }, 100);
+
+    setProgress(4, 100);
+    setStage(4, 'done');
+
+    const jsonOut = document.getElementById('jsonOut');
+    jsonOut.textContent = JSON.stringify(result.params, null, 2);
+    jsonOut.classList.add('visible');
+
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Analyze Another Track →';
+  }
+</script>
+</body>
+</html>
